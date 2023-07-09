@@ -6,6 +6,7 @@ import numpy as np
 import cv2 as cv
 import itertools
 import random
+import time
 
 MAP_FILE = 'cape_python.png'
 # Assign search area corner points
@@ -48,6 +49,10 @@ class Search():
         self.sep2 = 0
         self.sep3 = 0
 
+        self.p1 = 0.2
+        self.p2 = 0.5
+        self.p3 = 0.3
+
     def drawmap(self,last_known):
         ''' Display base map with scale ,draw last known location and search areas'''
         cv.line(self.img,(20,370),(70,370),(0,0,0),2)
@@ -70,7 +75,8 @@ class Search():
 
         cv.imshow("Search Area",self.img)
         cv.moveWindow("Search Area",750,10)
-        cv.waitKey(7000)
+        cv.waitKey(4000)
+        cv.destroyAllWindows()
 
 
 
@@ -119,7 +125,10 @@ class Search():
 
         random.shuffle(coords)
 
-        coords= coords[:int(len((coords)*effectiveness_prob))]
+        coords = coords[:int((len(coords)*effectiveness_prob))]
+
+        #coords = coords[:int((len(coords) * effectiveness_prob))] #Working
+
         loc_actual =(self.sailor_actual[0], self.sailor_actual[1])
 
         if area_num== self.area_actual and loc_actual in coords:
@@ -130,27 +139,133 @@ class Search():
         "Update area target probalities based on search effectiveness"
 
         # I initialized target probabilities here
-        p1=0.2
-        p2=0.5
-        p3=0.3
 
-        denom = self.p1 * (1-self.sep1) +self.p2*(1-self.sep2) + self.p3*(1-self.sep3)
+        denom = self.p1* (1-self.sep1) + self.p2*(1-self.sep2) + self.p3*(1-self.sep3)
 
         self.p1 = self.p1 * (1-self.sep1)/denom
         self.p2 = self.p2 * (1-self.sep2)/denom
         self.p3 = self.p3 * (1-self.sep3)/denom
 
-        return p1,p2,p3
 
 
-
-
-
-
+def draw_menu(search_num):
+    '''Print menu of choices for conducting area searches'''
+    print('\nSearch {}'.format(search_num))
+    print('''
+    
+    Choose next areas to search:
+    0 - Quit
+    1 - Search Area 1 twice
+    2 - Search Area 2 twice
+    3 - Search Area 3 twice 
+    4 - Search Area 1 & 2
+    5 - Search Area 1 & 3
+    6 - Search Area 2 & 3
+    7 - Start Over 
+    ''')
 
 def main():
     app = Search('Cape Python')
     app.drawmap(last_known=(160, 290))
+    sailor_x,sailor_y = app.sailor_final_location(num_search_areas=3)
+    print(sailor_y[0])
+    print('_'*65)
+    print("P1: {} P2: {} P3: {} ".format(app.p1,app.p2,app.p3))
+
+    search_num = 1
+
+    while True:     #Main application loop
+        draw_menu(search_num)
+        app.cal_search_effectivenes()
+
+        print("Choice")
+        choice= input('>')
+
+
+        if choice== '0':
+            sys.exit()
+
+        elif choice== '1':    #Searching Twice
+            result_1, coords1= app.conduct_search(area_num=1,area_array=app.sa1,effectiveness_prob=app.sep1)
+            result_2, coords2= app.conduct_search(area_num=1,area_array=app.sa1,effectiveness_prob=app.sep1)
+
+            app.sep1 = (len(set(coords1+coords2)))/(len(app.sa1)**2)
+            app.sep2 = 0
+            app.sep3 = 0
+
+        elif choice== '2':    #Searching Twice
+            result_1, coords1= app.conduct_search(area_num=2,area_array=app.sa2,effectiveness_prob=app.sep2)
+            result_2, coords2= app.conduct_search(area_num=2,area_array=app.sa2,effectiveness_prob=app.sep2)
+
+            app.sep2 = (len(set(coords1+coords2)))/(len(app.sa2)**2)
+            app.sep1 = 0
+            app.sep3 = 0
+
+        elif choice== '3':    #Searching Twice
+            result_1, coords1= app.conduct_search(area_num=3,area_array=app.sa3,effectiveness_prob=app.sep3)
+            result_2, coords2= app.conduct_search(area_num=3,area_array=app.sa3,effectiveness_prob=app.sep3)
+
+            app.sep3 = (len(set(coords1+coords2)))/(len(app.sa3)**2)
+            app.sep1 = 0
+            app.sep2 = 0
+
+        elif choice== '4':    #Searching Twice
+            result_1, coords1= app.conduct_search(area_num=1,area_array=app.sa1,effectiveness_prob=app.sep1)
+            result_2, coords2= app.conduct_search(area_num=2,area_array=app.sa2,effectiveness_prob=app.sep2)
+
+
+            app.sep3 = 0
+
+        elif choice== '5':    #Searching Twice
+            result_1, coords1= app.conduct_search(area_num=1,area_array=app.sa1,effectiveness_prob=app.sep1)
+            result_2, coords2= app.conduct_search(area_num=3,area_array=app.sa3,effectiveness_prob=app.sep3)
+
+            app.sep2 = 0
+
+        elif choice == '6':  # Searching Twice
+            result_1, coords1 = app.conduct_search(area_num=2, area_array=app.sa2, effectiveness_prob=app.sep2)
+            result_2, coords2 = app.conduct_search(area_num=3, area_array=app.sa3, effectiveness_prob=app.sep3)
+
+            app.sep2 = 0
+
+        elif choice == '7':
+            main()
+
+        else:
+            print("That is not a valid choice. You choose {}\nPlease enter a valid  number between 0-7".format(choice),file=sys.stderr)
+            continue  # continue runs the code from the top of the while loop
+
+
+        app.revise_target_probs()
+        print("Searching ...")
+        time.sleep(3)
+        print("\nSearch {} Results \n\n     Result 1: {} \n     Result 2: {} \n".format(search_num,result_1,result_2))
+
+        print("Effectiveness for Search {}\nE1= {:.3f}\nE2= {:.3f}\nE3= {:.3f}".format(search_num,app.sep1,app.sep2,app.sep3))
+
+        if result_1== result_2:
+            print("\nNew Target Probabilities for Search {} \nP1= {:.3f}\nP2= {:.3f}\nP3= {:.3f}".format(search_num+1,app.p1,app.p2,app.p3))
+        else:
+
+           # cv.circle(app.img,(sailor_x,sailor_y),3,(255,0,0),-1)
+
+            cv.circle(app.img,(sailor_x[0], sailor_y[0]),5, (255, 0, 0), -1)
+
+            cv.imshow('Search Area', app.img)
+            cv.waitKey(4000)
+            cv.destroyAllWindows()
+            time.sleep(2)
+
+
+            main()
+        search_num+= 1
+
+if __name__== '__main__:':
+    main()
+
+
+
+
 
 main()
 
